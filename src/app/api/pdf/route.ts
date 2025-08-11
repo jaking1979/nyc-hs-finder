@@ -50,17 +50,18 @@ export async function POST(req: Request) {
       });
     });
 
-    const bytes = await pdf.save(); // Uint8Array
-    const blob = new Blob([bytes], { type: 'application/pdf' }); // <-- fix
+const bytes = await pdf.save(); // Uint8Array
+// Convert Uint8Array -> ArrayBuffer for Response typing (Vercel build)
+const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 
-    return new Response(blob, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename="nyc-hs-guide.pdf"',
-        'Cache-Control': 'no-store',
-      },
-    });
+return new Response(arrayBuffer, {
+  status: 200,
+  headers: {
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'attachment; filename="nyc-hs-guide.pdf"',
+    'Cache-Control': 'no-store',
+  },
+});
   } catch (err) {
     return new Response(
       JSON.stringify({ error: 'pdf_failed', message: String((err as Error)?.message || err) }),
