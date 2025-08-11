@@ -27,6 +27,7 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
   const [preset, setPreset] = useState<PresetKey>("Balanced");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ScoredProgram[] | null>(null);
+  const [meta, setMeta] = useState<{ dataSource?: string; url?: string; programCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const canScore = useMemo(() => {
@@ -45,6 +46,7 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
       const json = await resp.json();
       if (!json.ok) throw new Error(json.error || "Score error");
       setResults(json.results as ScoredProgram[]);
+      setMeta(json.meta || null);
       setStep(4);
     } catch (e: any) {
       setError(e.message);
@@ -266,6 +268,15 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
       {results && step===4 && (
         <div style={{ marginTop: 24 }}>
           <h2>Top Matches</h2>
+          {meta && (
+            <div style={{ fontSize: 12, marginBottom: 12, color: "#555" }}>
+              Source: <strong>{meta.dataSource || "unknown"}</strong>
+              {typeof meta.programCount === "number" && <> · Programs loaded: <strong>{meta.programCount}</strong></>}
+              {meta.url && (
+                <> · <a href={meta.url} target="_blank" rel="noreferrer">view JSON</a></>
+              )}
+            </div>
+          )}
           <ol>
             {results.map((r) => (
               <li key={r.programId} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #eee" }}>

@@ -1,27 +1,37 @@
 import type { ProgramRow } from "../types/scoring";
-import fallback from "../data/programs.json"; // uses tsconfig resolveJsonModule
+import fallback from "../data/programs.json";
 
-// Load from a remote JSON (array of ProgramRow), cached for 24h on Vercel.
-// If PROGRAMS_JSON_URL is not set or fetch fails, use the local fallback JSON.
-export async function getPrograms(): Promise<ProgramRow[]> {
+export type ProgramsMeta = {
+  source: "remote" | "fallback" | "override";
+  url?: string;
+  count: number;
+  error?: string;
+};
+
+export async function getProgramsWithMeta(): Promise<{ list: ProgramRow[]; meta: ProgramsMeta }> {
   const url = process.env.PROGRAMS_JSON_URL;
 
   if (!url) {
-    return fallback as ProgramRow[];
+    const list = fallback as ProgramRow[];
+    return { list, meta: { source: "fallback", count: list.length } };
   }
 
   try {
-    const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } }); // 24h cache
+    const res = await fetch(url, { next: { revalidate: 60 * 60 * 24 } });
     if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-    const data = (await res.json()) as ProgramRow[];
-
-    // Basic shape check
-    if (!Array.isArray(data) || data.some(p => !p?.programId || !p?.schoolId || !p?.programName)) {
+    const list = (await res.json()) as ProgramRow[];
+    if (!Array.isArray(list) || list.some(p => !p?.programId || !p?.schoolId || !p?.programName)) {
       throw new Error("Invalid ProgramRow[] shape");
     }
-    return data;
-  } catch (e) {
-    console.warn("[getPrograms] Using fallback due to error:", e);
-    return fallback as ProgramRow[];
+    return { list, meta: { source: "remote", url, count: list.length } };
+  } catch (e: any) {
+    const list = fallback as ProgramRow[];
+    console.warn("[getProgramsWithMeta] Using fallback due to error:", e?.message || e);
+    return { list, meta: { source: "fallback", url, count: list.length, error: String(e?.message || e) } };
   }
+}
+
+export async function getPrograms(): Promise<ProgramRow[]> {
+  const { list } = await getProgramsWithMeta();
+  return list;
 }
