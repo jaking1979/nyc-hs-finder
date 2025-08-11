@@ -51,7 +51,9 @@ export async function POST(req: Request) {
     });
 
     const bytes = await pdf.save(); // Uint8Array
-    return new Response(bytes, {
+    const blob = new Blob([bytes], { type: 'application/pdf' }); // <-- fix
+
+    return new Response(blob, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
