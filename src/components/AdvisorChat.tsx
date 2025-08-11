@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { SlotState, ScoredProgram, ProgramRow } from "../types/scoring";
+
+const PRESETS = {
+  Balanced: { ProgramFit:0.34, Commute:0.22, Supports:0.18, Outcomes:0.18, Environment:0.08 },
+  ShortCommute: { ProgramFit:0.28, Commute:0.32, Supports:0.16, Outcomes:0.18, Environment:0.06 },
+  IEP_Priority: { ProgramFit:0.28, Commute:0.18, Supports:0.32, Outcomes:0.16, Environment:0.06 },
+  Outcomes_First: { ProgramFit:0.26, Commute:0.18, Supports:0.16, Outcomes:0.34, Environment:0.06 },
+} as const;
+type PresetKey = keyof typeof PRESETS;
 
 const EMPTY_SLOTS: SlotState = {
   boroughs: [],
@@ -14,10 +22,16 @@ const EMPTY_SLOTS: SlotState = {
 };
 
 export default function AdvisorChat({ initialPrograms }: { initialPrograms?: ProgramRow[] }) {
+  const [step, setStep] = useState<number>(0);
   const [slots, setSlots] = useState<SlotState>(EMPTY_SLOTS);
+  const [preset, setPreset] = useState<PresetKey>("Balanced");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ScoredProgram[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const canScore = useMemo(() => {
+    return (slots.boroughs?.length || 0) > 0 && (slots.programInterests?.length || 0) > 0;
+  }, [slots]);
 
   async function runScoring() {
     setLoading(true);
@@ -26,11 +40,12 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
       const resp = await fetch("/api/advise/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slots, programs: initialPrograms || undefined })
+        body: JSON.stringify({ slots, weights: PRESETS[preset], programs: initialPrograms || undefined })
       });
       const json = await resp.json();
       if (!json.ok) throw new Error(json.error || "Score error");
       setResults(json.results as ScoredProgram[]);
+      setStep(4);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -39,103 +54,246 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-      <h1>Advisor (MVP)</h1>
+    <div style={{ maxWidth: 980, margin: "40px auto", padding: 16 }}>
+      <h1 style={{ marginBottom: 8 }}>Advisor</h1>
+      <p style={{ marginTop: 0, color: "#666" }}>
+        Tell me about your child’s needs and interests. I’ll suggest programs and explain why each fits.
+      </p>
 
-      <section style={{ display: "grid", gap: 12, marginBottom: 16 }}>
-        <label>
-          Boroughs (comma‑sep):{" "}
-          <input
-            placeholder="Brooklyn, Queens"
-            onChange={(e) =>
-              setSlots((s) => ({
-                ...s,
-                boroughs: e.target.value
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean) as SlotState["boroughs"]
-              }))
-            }
-          />
-        </label>
+      <nav style={{ display: "flex", gap: 8, margin: "16px 0" }}>
+        {["Basics","Supports","Preferences","Weights","Results"].map((label,i)=>(
+          <button
+            key={label}
+            onClick={()=> setStep(i)}
+            style={{
+              padding: "6px 10px",
+              border: "1px solid #ddd",
+              background: i===step ? "#eee" : "#fff",
+              borderRadius: 6,
+              cursor: "pointer"
+            }}
+          >
+            {i+1}. {label}
+          </button>
+        ))}
+      </nav>
 
-        <label>
-          Commute cap (mins):{" "}
-          <input
-            type="number"
-            defaultValue={slots.commuteCapMins}
-            onChange={(e) => setSlots((s) => ({ ...s, commuteCapMins: Number(e.target.value || 60) }))}
-          />
-        </label>
+      {step===0 && (
+        <section style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+          <label>
+            Boroughs (comma‑sep):{" "}
+            <input
+              placeholder="Brooklyn, Queens"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  boroughs: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) as SlotState["boroughs"]
+                }))
+              }
+            />
+          </label>
 
-        <label>
-          Program interests (comma‑sep):{" "}
-          <input
-            placeholder="STEM, Health, VisualArts"
-            onChange={(e) =>
-              setSlots((s) => ({
-                ...s,
-                programInterests: e.target.value
-                  .split(",")
-                  .map((x) => x.trim())
-                  .filter(Boolean) as SlotState["programInterests"]
-              }))
-            }
-          />
-        </label>
+          <label>
+            Program interests (comma‑sep):{" "}
+            <input
+              placeholder="STEM, Health, VisualArts, Humanities, PerformingArts"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  programInterests: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) as SlotState["programInterests"]
+                }))
+              }
+            />
+          </label>
 
-        <label>
-          Must‑have arts (comma‑sep):{" "}
-          <input
-            placeholder="orchestra, visual-portfolio"
-            onChange={(e) =>
-              setSlots((s) => ({
-                ...s,
-                mustHaves: { ...s.mustHaves, arts: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) }
-              }))
-            }
-          />
-        </label>
+          <label>
+            Commute cap (mins):{" "}
+            <input
+              type="number"
+              defaultValue={slots.commuteCapMins}
+              onChange={(e) => setSlots((s) => ({ ...s, commuteCapMins: Number(e.target.value || 60) }))}
+            />
+          </label>
 
-        <label>
-          IEP inclusion required?{" "}
-          <input
-            type="checkbox"
-            onChange={(e) => setSlots((s) => ({ ...s, iepInclusionRequired: e.target.checked }))}
-          />
-        </label>
+          <label>
+            Diversity in Admissions eligible?{" "}
+            <input type="checkbox" onChange={(e) => setSlots((s) => ({ ...s, diversityEligible: e.target.checked }))} />
+          </label>
 
-        <label>
-          Diversity in Admissions eligible?{" "}
-          <input
-            type="checkbox"
-            onChange={(e) => setSlots((s) => ({ ...s, diversityEligible: e.target.checked }))}
-          />
-        </label>
-      </section>
+          <div style={{ marginTop: 8 }}>
+            <button onClick={()=> setStep(1)} style={{ padding: "8px 14px", borderRadius: 6 }}>Continue →</button>
+          </div>
+        </section>
+      )}
 
-      <button disabled={loading} onClick={runScoring}>
-        {loading ? "Scoring..." : "See Matches"}
-      </button>
+      {step===1 && (
+        <section style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+          <label>
+            IEP inclusion required?{" "}
+            <input type="checkbox" onChange={(e) => setSlots((s) => ({ ...s, iepInclusionRequired: e.target.checked }))} />
+          </label>
+
+          <label>
+            Supports needed (comma‑sep: IEP, ELL, Accessibility):{" "}
+            <input
+              placeholder="IEP, ELL"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  supportNeeds: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) as SlotState["supportNeeds"]
+                }))
+              }
+            />
+          </label>
+
+          <div>
+            Admissions to exclude:
+            <label style={{ marginLeft: 12 }}>
+              <input
+                type="radio"
+                name="adopt"
+                defaultChecked
+                onChange={()=> setSlots((s)=> ({...s, admissionsOptOut: "allow_all"}))}
+              /> allow all
+            </label>
+            <label style={{ marginLeft: 12 }}>
+              <input
+                type="radio"
+                name="adopt"
+                onChange={()=> setSlots((s)=> ({...s, admissionsOptOut: "no_audition"}))}
+              /> no audition
+            </label>
+            <label style={{ marginLeft: 12 }}>
+              <input
+                type="radio"
+                name="adopt"
+                onChange={()=> setSlots((s)=> ({...s, admissionsOptOut: "no_screened"}))}
+              /> no screened
+            </label>
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            <button onClick={()=> setStep(2)} style={{ padding: "8px 14px", borderRadius: 6 }}>Continue →</button>
+          </div>
+        </section>
+      )}
+
+      {step===2 && (
+        <section style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+          <label>
+            Classroom style preference:
+            <select
+              defaultValue="Either"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  environmentPrefs: { ...(s.environmentPrefs||{}), pedagogy: e.target.value as any }
+                }))
+              }
+              style={{ marginLeft: 8 }}
+            >
+              <option>Either</option>
+              <option>Traditional</option>
+              <option>Progressive</option>
+            </select>
+          </label>
+
+          <label>
+            Must‑have arts (comma‑sep):{" "}
+            <input
+              placeholder="orchestra, visual-portfolio"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  mustHaves: { ...s.mustHaves, arts: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) }
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            Must‑have languages (comma‑sep):{" "}
+            <input
+              placeholder="Spanish, Mandarin"
+              onChange={(e) =>
+                setSlots((s) => ({
+                  ...s,
+                  mustHaves: { ...s.mustHaves, languages: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) }
+                }))
+              }
+            />
+          </label>
+
+          <div style={{ marginTop: 8 }}>
+            <button onClick={()=> setStep(3)} style={{ padding: "8px 14px", borderRadius: 6 }}>Continue →</button>
+          </div>
+        </section>
+      )}
+
+      {step===3 && (
+        <section style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+          <div>
+            <strong>Weight preset:</strong>
+            {Object.keys(PRESETS).map((k)=>(
+              <button
+                key={k}
+                onClick={()=> setPreset(k as PresetKey)}
+                style={{
+                  marginLeft: 8, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 6,
+                  background: preset===k ? "#eee" : "#fff", cursor: "pointer"
+                }}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <button
+              disabled={!canScore || loading}
+              onClick={runScoring}
+              style={{ padding: "10px 16px", borderRadius: 8 }}
+            >
+              {loading ? "Scoring..." : "See Matches"}
+            </button>
+            {!canScore && <span style={{ marginLeft: 12, color: "#666" }}>Add boroughs and interests first</span>}
+          </div>
+        </section>
+      )}
 
       {error && <p style={{ color: "crimson" }}>{error}</p>}
 
-      {results && (
+      {results && step===4 && (
         <div style={{ marginTop: 24 }}>
-          <h2>Results</h2>
+          <h2>Top Matches</h2>
           <ol>
             {results.map((r) => (
-              <li key={r.programId} style={{ marginBottom: 12 }}>
-                <strong>{r.name}</strong> — {r.schoolName} (score {r.score})
-                <div style={{ fontSize: 14, opacity: 0.8 }}>{r.rationale}</div>
+              <li key={r.programId} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #eee" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <strong>{r.name}</strong>
+                  <span style={{ fontSize: 13, color: "#444" }}>Score {r.score}</span>
+                </div>
+                <div style={{ fontSize: 14, opacity: 0.85 }}>{r.schoolName}</div>
+                <div style={{ fontSize: 14, marginTop: 6, opacity: 0.9 }}>{r.rationale}</div>
                 <details style={{ marginTop: 6 }}>
                   <summary>Why this match?</summary>
-                  <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(r.pillars, null, 2)}</pre>
+                  <div style={{ fontSize: 13 }}>
+                    <div>Program Fit: {r.pillars.ProgramFit}</div>
+                    <div>Commute: {r.pillars.Commute}</div>
+                    <div>Supports: {r.pillars.Supports}</div>
+                    <div>Outcomes: {r.pillars.Outcomes}</div>
+                    <div>Environment: {r.pillars.Environment}</div>
+                    {r.pillars.penalties !== 0 && <div>Penalties: {r.pillars.penalties}</div>}
+                  </div>
                 </details>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Data as of {r.dataAsOf}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>Data as of {r.dataAsOf}</div>
               </li>
             ))}
           </ol>
+
+          <button onClick={()=> setStep(0)} style={{ marginTop: 8, padding: "8px 14px", borderRadius: 6 }}>
+            Start over
+          </button>
         </div>
       )}
     </div>
