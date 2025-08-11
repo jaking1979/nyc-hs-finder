@@ -2,10 +2,13 @@
 export const runtime = 'nodejs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
+type SchoolSummary = { name?: string } & Record<string, unknown>;
+type ResultItem = { school: SchoolSummary };
+
 type Payload = {
   profile?: { weights?: Record<string, number>; summary?: string };
-  results?: Array<{ school: any }>;
-  hiddenGems?: any[];
+  results?: ResultItem[];
+  hiddenGems?: unknown[];
   commuteCap?: number;
 };
 
@@ -24,7 +27,7 @@ export async function POST(req: Request) {
     });
 
     // Meta lines
-    const meta = [
+    const meta: string[] = [
       `Generated: ${new Date().toLocaleString()}`,
       `Items: ${body.results?.length ?? 0}`,
       body.profile?.summary ? `Profile: ${body.profile.summary}` : '',
@@ -37,7 +40,10 @@ export async function POST(req: Request) {
     });
 
     // List first few school names
-    const names = (body.results ?? []).slice(0, 5).map(r => String(r.school?.name ?? 'School'));
+    const names = (body.results ?? [])
+      .slice(0, 5)
+      .map((r) => String(r.school?.name ?? 'School'));
+
     names.forEach((name, i) => {
       page.drawText(`${i + 1}. ${name}`, {
         x: 72, y: 640 - i * 18, size: 12, font, color: rgb(0.1, 0.1, 0.1),
