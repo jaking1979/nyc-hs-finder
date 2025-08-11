@@ -1,4 +1,4 @@
-import type { ProgramRow } from "@/scoring";
+import type { ProgramRow } from "@/types/scoring";
 
 const programs: ProgramRow[] = [
   {
