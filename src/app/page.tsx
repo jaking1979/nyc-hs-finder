@@ -48,6 +48,29 @@ export default function HomePage() {
   const [liveSchools, setLiveSchools] = React.useState<School[]>(MOCK);
   const [busy, setBusy] = React.useState(false);
 
+  // Unlock / PWYW
+  const [unlocked, setUnlocked] = React.useState(false);
+  const [showPay, setShowPay] = React.useState(false);
+  const [amount, setAmount] = React.useState<string>("0"); // dollars as string
+  const didAutoDownload = React.useRef(false);
+
+  // Handle return from Stripe: ?unlocked=1
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('unlocked') === '1') {
+      setUnlocked(true);
+      // Clean URL
+      const { protocol, host, pathname } = window.location;
+      window.history.replaceState({}, '', `${protocol}//${host}${pathname}`);
+      // Auto-download once
+      if (!didAutoDownload.current) {
+        didAutoDownload.current = true;
+        setTimeout(() => { downloadPDF(); }, 150);
+      }
+    }
+  }, []);
+
   React.useEffect(()=>{
     let active = true;
     if (!location || location.trim().length < 3) { setLiveSchools(MOCK); return; }
@@ -98,6 +121,32 @@ export default function HomePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'nyc-hs-guide.pdf'; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function startUnlock() {
+    // Convert dollars -> cents (int), guard NaN
+    const cents = Math.max(0, Math.round((parseFloat(amount || '0') || 0) * 100));
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: cents })
+      });
+      if (!res.ok) { alert('Payment error. Please try again.'); return; }
+      const data = await res.json();
+      if (data.unlocked) {
+        setShowPay(false);
+        setUnlocked(true);
+        // Immediate download
+        await downloadPDF();
+        return;
+      }
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl as string;
+        return;
+      }
+      alert('Unexpected response. Please try again.');
+    } catch (e) {
+      alert('Unable to start checkout.');
+    }
   }
 
   return (
@@ -243,11 +292,50 @@ export default function HomePage() {
             <button onClick={()=>setStep(1)} style={{ padding:"8px 12px", borderRadius:8, border:"1px solid #cbd5e1", background:"#fff", cursor:"pointer" }}>
               Back
             </button>
-            <button onClick={downloadPDF} style={{ padding:"8px 12px", borderRadius:8, background:"#1d4ed8", border:"1px solid #1d4ed8", color:"#fff", cursor:"pointer" }}>
-              Download PDF
-            </button>
+            {unlocked ? (
+              <button onClick={downloadPDF} style={{ padding:"8px 12px", borderRadius:8, background:"#1d4ed8", border:"1px solid #1d4ed8", color:"#fff", cursor:"pointer" }}>
+                Download PDF
+              </button>
+            ) : (
+              <button onClick={()=>setShowPay(true)} style={{ padding:"8px 12px", borderRadius:8, background:"#22c55e", border:"1px solid #16a34a", color:"#fff", cursor:"pointer" }}>
+                Unlock & Download
+              </button>
+            )}
           </div>
         </section>
+      )}
+
+      {showPay && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.35)', display:'grid', placeItems:'center', zIndex:50 }}>
+          <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:12, padding:16, width:480, maxWidth:'90vw' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div style={{ fontWeight:700, fontSize:18 }}>Support access for all</div>
+              <button onClick={()=>setShowPay(false)} style={{ border:'none', background:'transparent', cursor:'pointer', fontSize:18 }}>×</button>
+            </div>
+            <p style={{ color:'#475569', marginTop:0 }}>
+              Pay what you can. $0 is okay — payments help cover families who can’t pay.
+            </p>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span>$</span>
+              <input
+                type="number" min={0} step={1}
+                value={amount}
+                onChange={(e)=>setAmount(e.target.value)}
+                style={{ padding:"8px 10px", border:"1px solid #cbd5e1", borderRadius:8, width:120 }}
+              />
+              <span style={{ color:'#64748b' }}>/ one-time</span>
+            </div>
+            <div style={{ display:'flex', gap:8, marginTop:12 }}>
+              <button onClick={()=>setAmount('0')} style={{ padding:'6px 10px', border:'1px solid #e2e8f0', borderRadius:8, background:'#fff', cursor:'pointer' }}>Set $0</button>
+              <button onClick={()=>setAmount('25')} style={{ padding:'6px 10px', border:'1px solid #e2e8f0', borderRadius:8, background:'#fff', cursor:'pointer' }}>$25</button>
+              <button onClick={()=>setAmount('50')} style={{ padding:'6px 10px', border:'1px solid #e2e8f0', borderRadius:8, background:'#fff', cursor:'pointer' }}>$50</button>
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={()=>setShowPay(false)} style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #cbd5e1', background:'#fff', cursor:'pointer' }}>Cancel</button>
+              <button onClick={startUnlock} style={{ padding:'8px 12px', borderRadius:8, background:'#22c55e', border:'1px solid #16a34a', color:'#fff', cursor:'pointer' }}>Unlock</button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
