@@ -1,6 +1,7 @@
 // src/app/api/pdf/route.ts
 export const runtime = 'nodejs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { Buffer } from 'node:buffer';
 
 type SchoolSummary = { name?: string } & Record<string, unknown>;
 type ResultItem = { school: SchoolSummary };
@@ -51,10 +52,9 @@ export async function POST(req: Request) {
     });
 
 const bytes = await pdf.save(); // Uint8Array
-// Convert Uint8Array -> ArrayBuffer for Response typing (Vercel build)
-const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+const buf = Buffer.from(bytes); // Node Buffer works with Response in Node runtime
 
-return new Response(arrayBuffer, {
+return new Response(buf, {
   status: 200,
   headers: {
     'Content-Type': 'application/pdf',
