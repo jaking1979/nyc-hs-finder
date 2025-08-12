@@ -285,6 +285,18 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
                   <span style={{ fontSize: 13, color: "#444" }}>Score {r.score}</span>
                 </div>
                 <div style={{ fontSize: 14, opacity: 0.85 }}>{r.schoolName}</div>
+                <div style={{ fontSize: 13, marginTop: 6, color: "#444" }}>
+                  {r.admissionsMethod && (
+                    <span style={{ display:"inline-block", padding:"2px 8px", border:"1px solid #ddd", borderRadius:999, marginRight:8 }}>
+                      {String(r.admissionsMethod)}
+                    </span>
+                  )}
+                  {Array.isArray((r as any).admissionsPriorities) && (r as any).admissionsPriorities.length > 0 && (
+                    <span style={{ color:"#555" }}>
+                      Priority: {(r as any).admissionsPriorities[0]}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 14, marginTop: 6, opacity: 0.9 }}>{r.rationale}</div>
                 <details style={{ marginTop: 6 }}>
                   <summary>Why this match?</summary>
@@ -297,6 +309,25 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
                     {r.pillars.penalties !== 0 && <div>Penalties: {r.pillars.penalties}</div>}
                   </div>
                 </details>
+                {(((r as any).eligibilityText) || ((r as any).admissionsPriorities && (r as any).admissionsPriorities.length)) && (
+                  <details style={{ marginTop: 6 }}>
+                    <summary>Eligibility & priorities</summary>
+                    <div style={{ fontSize: 13, color:"#333" }}>
+                      {(r as any).eligibilityText && (
+                        <div style={{ marginBottom: 6 }}>
+                          {(r as any).eligibilityText}
+                        </div>
+                      )}
+                      {Array.isArray((r as any).admissionsPriorities) && (r as any).admissionsPriorities.length > 0 && (
+                        <ul style={{ margin:"6px 0 0 18px" }}>
+                          {(r as any).admissionsPriorities.map((p:string, idx:number)=>(
+                            <li key={idx}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </details>
+                )}
                 <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>Data as of {r.dataAsOf}</div>
               </li>
             ))}
