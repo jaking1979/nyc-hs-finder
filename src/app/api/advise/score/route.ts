@@ -33,6 +33,36 @@ export async function POST(req: Request) {
         p.languages = [...schoolLangs];
       }
     }
+
+    // Normalize: infer artsTags from programTags and audition text when missing
+    for (const p of list) {
+      const arts = (p as any).artsTags as string[] | undefined;
+      if (Array.isArray(arts) && arts.length > 0) continue;
+
+      const inferred = new Set<string>();
+      const tags = (((p as any).programTags || []) as string[]);
+      const auditionInfo = String((p as any)?.audition?.info || "");
+      const lower = auditionInfo.toLowerCase();
+
+      // Visual arts
+      if (tags.includes("VisualArts")) {
+        inferred.add("Visual portfolio");
+      }
+
+      // Performing arts – try to identify discipline from audition text
+      if (tags.includes("PerformingArts") || lower.length > 0) {
+        if (lower.includes("dance")) inferred.add("Dance");
+        if (/theater|theatre|drama/.test(lower)) inferred.add("Theater");
+        if (/vocal|choral|sing/.test(lower)) inferred.add("Vocal music");
+        if (/instrument|band|orchestra|jazz|piano|guitar|strings|winds|percussion/.test(lower)) inferred.add("Instrumental music");
+        // If performing arts is tagged but no specific discipline found, default to Theater
+        if (tags.includes("PerformingArts") && inferred.size === 0) inferred.add("Theater");
+      }
+
+      if (inferred.size > 0) {
+        (p as any).artsTags = Array.from(inferred);
+      }
+    }
     // Score
     const results = scorePrograms(list, body.slots, weights);
 
