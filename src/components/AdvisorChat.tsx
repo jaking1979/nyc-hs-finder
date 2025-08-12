@@ -26,7 +26,7 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
   const [slots, setSlots] = useState<SlotState>(EMPTY_SLOTS);
   const [preset, setPreset] = useState<PresetKey>("Balanced");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ScoredProgram[] | null>(null);
+  const [results, setResults] = useState<(ScoredProgram & { admissionsMethod?: string; admissionsPriorities?: string[]; eligibilityText?: string; programCode?: string; tags?: string[]; dataAsOf?: string; })[] | null>(null);
   const [meta, setMeta] = useState<{ dataSource?: string; url?: string; programCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export default function AdvisorChat({ initialPrograms }: { initialPrograms?: Pro
       });
       const json = await resp.json();
       if (!json.ok) throw new Error(json.error || "Score error");
-      setResults(json.results as ScoredProgram[]);
+      setResults(json.results as any);
       setMeta(json.meta || null);
       setStep(4);
     } catch (e: any) {
