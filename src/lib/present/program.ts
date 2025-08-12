@@ -1,4 +1,4 @@
-import type { ScoredProgram } from "../types/scoring";
+import type { ScoredProgram } from "../../types/scoring";
 
 export function labelAdmissions(s: string|undefined){
   if(!s) return "Admissions: Other";
@@ -11,7 +11,7 @@ export function labelAdmissions(s: string|undefined){
   return "Other";
 }
 
-export function renderProgramMeta(p: ScoredProgram){
+export function renderProgramMeta(p: ScoredProgram ScoredProgram) { admissionsMethod?: string; tags?: string[] }){
   const lines: string[] = [];
   lines.push(`${labelAdmissions(p.admissionsMethod)} · Score ${p.score}`);
   if (p.tags?.length) lines.push(p.tags.slice(0,3).join(" • "));

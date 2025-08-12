@@ -1,5 +1,5 @@
-@import "/src/styles/tokens.css";
-@import "/src/styles/tokens.css";
+@import "../styles/tokens.css";
+@import "../styles/tokens.css";
 @import "tailwindcss";
 
 :root {
