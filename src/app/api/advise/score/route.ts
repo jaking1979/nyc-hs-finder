@@ -25,6 +25,14 @@ export async function POST(req: Request) {
       meta = provided.meta;
     }
 
+    // Normalize: if a program has no languages list, inherit from school-level language_classes
+    for (const p of list) {
+      const schoolLangs = (p as any)?.school?.languageClasses as string[] | undefined;
+      if ((!p as any) || !Array.isArray(schoolLangs)) continue;
+      if ((!p.languages || p.languages.length === 0) && schoolLangs.length > 0) {
+        p.languages = [...schoolLangs];
+      }
+    }
     // Score
     const results = scorePrograms(list, body.slots, weights);
 
