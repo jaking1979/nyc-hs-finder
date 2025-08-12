@@ -28,13 +28,13 @@ export async function POST(req: Request) {
     // Normalize: if a program has no languages list, inherit from school-level language_classes
     for (const p of list) {
       const schoolLangs = (p as any)?.school?.languageClasses as string[] | undefined;
-      if ((!p as any) || !Array.isArray(schoolLangs)) continue;
+      if (!Array.isArray(schoolLangs)) continue;
       if ((!p.languages || p.languages.length === 0) && schoolLangs.length > 0) {
         p.languages = [...schoolLangs];
       }
     }
 
-    // Normalize: infer artsTags from programTags and audition text when missing
+    // Normalize: infer artsTags from programTags + audition text + program name when missing
     for (const p of list) {
       const arts = (p as any).artsTags as string[] | undefined;
       if (Array.isArray(arts) && arts.length > 0) continue;
@@ -42,25 +42,29 @@ export async function POST(req: Request) {
       const inferred = new Set<string>();
       const tags = (((p as any).programTags || []) as string[]);
       const auditionInfo = String((p as any)?.audition?.info || "");
-      const lower = auditionInfo.toLowerCase();
+      const nameInfo = String((p as any)?.programName || "");
+      const lower = (auditionInfo + " " + nameInfo).toLowerCase();
 
       // Visual arts
       if (tags.includes("VisualArts")) {
         inferred.add("Visual portfolio");
       }
 
-      // Performing arts – try to identify discipline from audition text
+      // Performing arts – try to identify discipline from audition text or name
       if (tags.includes("PerformingArts") || lower.length > 0) {
         if (lower.includes("dance")) inferred.add("Dance");
-        if (/theater|theatre|drama/.test(lower)) inferred.add("Theater");
-        if (/vocal|choral|sing/.test(lower)) inferred.add("Vocal music");
-        if (/instrument|band|orchestra|jazz|piano|guitar|strings|winds|percussion/.test(lower)) inferred.add("Instrumental music");
+        if (/(^|\W)(theater|theatre|drama)(\W|$)/.test(lower)) inferred.add("Theater");
+        if (/(^|\W)(vocal|choral|sing)(\W|$)/.test(lower)) inferred.add("Vocal music");
+        if (/(^|\W)(instrument|band|orchestra|jazz|piano|guitar|strings|winds|percussion)(\W|$)/.test(lower)) inferred.add("Instrumental music");
         // If performing arts is tagged but no specific discipline found, default to Theater
         if (tags.includes("PerformingArts") && inferred.size === 0) inferred.add("Theater");
       }
 
       if (inferred.size > 0) {
         (p as any).artsTags = Array.from(inferred);
+      } else {
+        // ensure consistent shape for scorer (empty array instead of undefined)
+        (p as any).artsTags = [];
       }
     }
     // Score
